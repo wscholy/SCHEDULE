@@ -1,56 +1,60 @@
 import streamlit as st
+from streamlit_calendar import calendar
 import pandas as pd
 from datetime import datetime
-import plotly.express as px
 
-st.set_page_config(page_title="스마트 일정 관리", page_icon="📅")
+st.set_page_config(page_title="달력 일정 관리", page_icon="🗓️")
 
-st.title("📅 나만의 스마트 일정 관리기")
+st.title("🗓️ 달력 기반 일정 관리 앱")
 
-# 1. 데이터 저장소 초기화 (세션 상태 이용)
+# 1. 데이터 초기화
 if 'tasks' not in st.session_state:
-    st.session_state.tasks = pd.DataFrame(columns=["할 일", "마감일", "상태"])
+    st.session_state.tasks = []
 
-# 2. 사이드바 - 새로운 일정 추가
+# 2. 사이드바 - 일정 입력
 with st.sidebar:
-    st.header("➕ 새로운 일정")
-    new_task = st.text_input("무엇을 해야 하나요?")
-    due_date = st.date_input("마감일", datetime.now())
-    add_btn = st.button("추가하기")
+    st.header("➕ 일정 추가")
+    title = st.text_input("일정 제목")
+    start_date = st.date_input("날짜", datetime.now())
+    color = st.color_picker("색상 선택", "#3788d8")
+    add_btn = st.button("달력에 추가")
 
-    if add_btn and new_task:
-        new_row = pd.DataFrame([{"할 일": new_task, "마감일": due_date, "상태": "진행 중"}])
-        st.session_state.tasks = pd.concat([st.session_state.tasks, new_row], ignore_index=True)
-        st.success("일정이 추가되었습니다!")
+    if add_btn and title:
+        # 달력 컴포넌트 형식에 맞게 데이터 저장
+        new_event = {
+            "title": title,
+            "start": start_date.strftime("%Y-%m-%d"),
+            "backgroundColor": color,
+            "borderColor": color
+        }
+        st.session_state.tasks.append(new_event)
+        st.success("추가 완료!")
 
-# 3. 메인 화면 - 일정 목록 및 관리
-st.subheader("📝 현재 일정 목록")
+# 3. 달력 설정 및 표시
+calendar_options = {
+    "editable": True,
+    "selectable": True,
+    "headerToolbar": {
+        "left": "today prev,next",
+        "center": "title",
+        "right": "dayGridMonth,dayGridWeek,dayGridDay",
+    },
+    "initialView": "dayGridMonth",
+}
 
-if not st.session_state.tasks.empty:
-    # 데이터프레임 표시 (편집 가능하도록)
-    edited_df = st.data_editor(
-        st.session_state.tasks,
-        column_config={
-            "상태": st.column_config.SelectboxColumn(
-                "상태", options=["진행 중", "완료", "보류"], required=True
-            )
-        },
-        use_container_width=True,
-        num_rows="dynamic"
-    )
-    st.session_state.tasks = edited_df
+st.subheader("📅 이번 달 스케줄")
+state = calendar(
+    events=st.session_state.tasks,
+    options=calendar_options,
+    key='calendar',
+)
 
-    # 4. 통계 시각화
-    st.divider()
-    st.subheader("📊 진행 상황 요약")
-    
-    status_counts = st.session_state.tasks["상태"].value_counts().reset_index()
-    status_counts.columns = ["상태", "개수"]
-    
-    fig = px.pie(status_counts, values="개수", names="상태", 
-                 color="상태", 
-                 color_discrete_map={'진행 중':'#EF553B', '완료':'#00CC96', '보류':'#636EFA'},
-                 hole=0.4)
-    st.plotly_chart(fig)
+# 4. 등록된 일정 리스트 출력
+st.divider()
+st.subheader("📋 전체 일정 요약")
+if st.session_state.tasks:
+    df = pd.DataFrame(st.session_state.tasks)[["title", "start"]]
+    df.columns = ["일정 내용", "날짜"]
+    st.table(df)
 else:
-    st.info("현재 등록된 일정이 없습니다. 사이드바에서 일정을 추가해 보세요!")
+    st.info("등록된 일정이 없습니다.")
